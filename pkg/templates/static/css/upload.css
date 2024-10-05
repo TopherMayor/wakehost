@@ -1,0 +1,13 @@
+.file-title{
+    max-width: 200px;
+    overflow:  hidden;
+    text-wrap: nowrap;
+}
+#progressContainer{
+	max-height: 350px;
+	overflow: auto;
+    scrollbar-width: none;
+}
+#uploadModal{
+    max-width: 90vw;
+}

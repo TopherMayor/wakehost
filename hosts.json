@@ -1,0 +1,39 @@
+{
+  "Hosts": {
+    "": {
+      "name": "",
+      "macAddress": "",
+      "ipAddress": "",
+      "alternatePort": "",
+      "onlineStatus": false
+    },
+    "hyte-revolt": {
+      "name": "hyte-revolt",
+      "macAddress": "74:56:3C:BA:A9:6D",
+      "ipAddress": "192.168.254.172",
+      "alternatePort": "",
+      "onlineStatus": true
+    },
+    "pve": {
+      "name": "pve",
+      "macAddress": "3C:7C:3F:23:5C:C5",
+      "ipAddress": "192.168.254.10",
+      "alternatePort": "",
+      "onlineStatus": true
+    },
+    "pvp": {
+      "name": "pvp",
+      "macAddress": "3c:7c:3f:23:5c:c5",
+      "ipAddress": "192.168.254.11",
+      "alternatePort": "",
+      "onlineStatus": false
+    },
+    "test": {
+      "name": "test",
+      "macAddress": "3c:7c:3f:23:5c:c6",
+      "ipAddress": "192.168.254.12",
+      "alternatePort": "",
+      "onlineStatus": true
+    }
+  }
+}
