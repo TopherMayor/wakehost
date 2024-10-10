@@ -22,7 +22,7 @@ var hosts = map[string]models.Host{}
 var pveHosts = map[string]models.PVEHost{}
 var currentHost models.Host
 var currentPVEHost models.PVEHost
-var currentDB database.PostgresConfig
+var CurrentDB database.PostgresConfig
 
 func loadInitialHosts() {
 	getHosts()
@@ -40,6 +40,8 @@ func Router() *gin.Engine {
 	} else {
 		database.ConfigNeeded = false
 		database.ConnectDatabase()
+		CurrentDB = database.DbConfig.Databases[database.SelectedConfigName]
+
 		loadInitialHosts()
 
 	}
@@ -57,7 +59,7 @@ func Router() *gin.Engine {
 		db := c.PostForm("db")
 		fmt.Println("db: ", db)
 		if db != "" {
-			currentDB = database.DbConfig.Databases[db]
+			CurrentDB = database.DbConfig.Databases[db]
 			c.Redirect(302, "/databases/edit/"+db)
 		} else {
 			c.Redirect(302, "/home")
@@ -76,7 +78,7 @@ func Router() *gin.Engine {
 		if database.ConfigNeeded {
 			c.Redirect(302, "/setup")
 		} else {
-			c.HTML(http.StatusOK, "editdb.html", gin.H{"DB": currentDB})
+			c.HTML(http.StatusOK, "editdb.html", gin.H{"DB": CurrentDB})
 		}
 	})
 	r.POST("/databases/edit/:name", func(c *gin.Context) {
