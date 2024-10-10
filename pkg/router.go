@@ -2,6 +2,7 @@ package router
 
 import (
 	"embed"
+	"fmt"
 	"html/template"
 	io "io/fs"
 	"net/http"
@@ -21,6 +22,7 @@ var hosts = map[string]models.Host{}
 var pveHosts = map[string]models.PVEHost{}
 var currentHost models.Host
 var currentPVEHost models.PVEHost
+var currentDB database.PostgresConfig
 
 func loadInitialHosts() {
 	getHosts()
@@ -51,6 +53,17 @@ func Router() *gin.Engine {
 	r.GET("/setup", getSetupHandler)
 	r.POST("/setup", database.PostSetupHandler)
 	r.GET("/home", getHomeHandler)
+	r.POST("/home", func(c *gin.Context) {
+		db := c.PostForm("db")
+		fmt.Println("db: ", db)
+		if db != "" {
+			currentDB = database.DbConfig.Databases[db]
+			c.Redirect(302, "/databases/edit/"+db)
+		} else {
+			c.Redirect(302, "/home")
+		}
+	})
+
 	r.GET("/registeredhosts", getHostsHandler)
 	r.GET("/addhost", getAddHostHandler)
 	r.GET("/registeredhosts/edit/:name", getEditHostHandler)
@@ -59,6 +72,39 @@ func Router() *gin.Engine {
 	r.GET("/pvehosts/:name", getPVEHostHandler)
 	r.POST("/registeredhosts", postHostHandler)
 	r.POST("/pvehosts/:name", postPVEHostHandler)
+	r.GET("/databases/edit/:name", func(c *gin.Context) {
+		if database.ConfigNeeded {
+			c.Redirect(302, "/setup")
+		} else {
+			c.HTML(http.StatusOK, "editdb.html", gin.H{"DB": currentDB})
+		}
+	})
+	r.POST("/databases/edit/:name", func(c *gin.Context) {
+		ipadd := c.PostForm("ipAddress")
+		port := c.PostForm("port")
+		user := c.PostForm("user")
+		name := c.PostForm("name")
+		password := c.PostForm("password")
+		ssl := c.PostForm("ssl")
+		if ssl == "" {
+			ssl = "disable"
+		}
+
+		updatedDB := database.PostgresConfig{
+			Host:     ipadd,
+			Port:     port,
+			User:     user,
+			Name:     name,
+			Password: password,
+			SSLMode:  ssl,
+		}
+		database.DbConfig.Databases[updatedDB.Name] = updatedDB
+		database.SelectedConfigName = updatedDB.Name
+		database.ConnectDatabase()
+
+		c.Redirect(302, "/home")
+
+	})
 
 	return r
 }

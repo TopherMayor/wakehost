@@ -55,8 +55,8 @@
                         <ul class="dropdown-menu">
                             {{range $key, $element := .Databases}}
                             <li>
-                                <form class="dropdown-item">
-                                    <button type="submit" class="form-control" id="wol" name="wol"
+                                <form method="post" class="dropdown-item">
+                                    <button type="submit" class="form-control" id="db" name="db"
                                         value="{{$element.Name}}">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
                                             fill="currentColor" class="bi bi-power" viewBox="0 0 16 16">

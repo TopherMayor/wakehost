@@ -21,7 +21,7 @@ func checkifHostsOnline() {
 		if onlineStatus != v.OnlineStatus {
 			v.OnlineStatus = onlineStatus
 		}
-		database.Db.Exec(`UPDATE wol3
+		database.Db.Exec(`UPDATE wolhosts
 			SET onlineStatus=$1 WHERE name=$2;`, onlineStatus, v.Name)
 	}
 }
@@ -85,8 +85,11 @@ func postHostHandler(c *gin.Context) {
 func addHostHandler(c *gin.Context) {
 	fmt.Println("adding")
 	newhost := createHost(c)
-	if c.PostForm("proxmox") != "" {
-		newhost.IsProxmox = true
+	fmt.Println("username: ", c.PostForm("username"))
+	fmt.Println("newhost ", newhost)
+
+	if c.PostForm("username") != "" {
+		fmt.Println("adding pve host: ", c.PostForm("username"))
 		newPVEhost := models.PVEHost{Name: c.PostForm("name"),
 			MacAddress:    newhost.MacAddress,
 			IpAddress:     newhost.IpAddress,
@@ -109,8 +112,11 @@ func postEditHostHandler(c *gin.Context) {
 	onlineStatus := pingHost(ipAdd.String())
 	alternatePort := c.PostForm("alternatePort")
 	isProxmox := false
+	fmt.Println("username: ", c.PostForm("username"))
+
 	if c.PostForm("username") != "" {
 		isProxmox = true
+
 		newPVEhost := models.PVEHost{Name: c.PostForm("name"),
 			MacAddress:    c.PostForm("macAddress"),
 			IpAddress:     c.PostForm("ipAddress"),
@@ -136,7 +142,7 @@ func postEditHostHandler(c *gin.Context) {
 }
 func deleteHost(hostName string) {
 	fmt.Println("deleting?", hostName)
-	_, errDel := database.Db.Exec(`DELETE FROM wol3
+	_, errDel := database.Db.Exec(`DELETE FROM wolhosts
 	 WHERE name=$1;`, hostName)
 	if errDel != nil {
 		fmt.Println("panic")
@@ -163,7 +169,7 @@ func updateHost(host models.Host) {
 			cmd += ", "
 		}
 	}
-	var final = `UPDATE wol3
+	var final = `UPDATE wolhosts
 	SET ` + cmd + ` WHERE name='` + currentHost.Name + `';`
 	_, err := database.Db.Exec(final)
 	if err != nil {
@@ -209,7 +215,7 @@ func findColumnDiffs(oldData models.Host, newData models.Host) ([]string, []stri
 func addHost(newhost models.Host) {
 	rows, rowErr := database.Db.Query(`
 	SELECT *
-	FROM wol3
+	FROM wolhosts
 	WHERE name=$1 OR macaddress=$2 OR ipaddress=$3`, newhost.Name, newhost.MacAddress, newhost.IpAddress)
 	fmt.Println("rows:", rows)
 	if rowErr != nil {
@@ -229,8 +235,8 @@ func addHost(newhost models.Host) {
 	}
 	if !Contains(hosts, newhost) {
 		database.Db.Exec(`
-		INSERT INTO wol3(name, macaddress, ipaddress, alternateport, onlinestatus, proxmox) 
-		VALUES($1, $2, $3, $4, $5, $6);`, newhost.Name, newhost.MacAddress, newhost.IpAddress, newhost.AlternatePort, newhost.OnlineStatus, false)
+		INSERT INTO wolhosts(name, macaddress, ipaddress, alternateport, onlinestatus, proxmox) 
+		VALUES($1, $2, $3, $4, $5, $6);`, newhost.Name, newhost.MacAddress, newhost.IpAddress, newhost.AlternatePort, newhost.OnlineStatus, newhost.IsProxmox)
 	}
 
 }
@@ -239,7 +245,7 @@ func getHosts() {
 	var currentHosts = map[string]models.Host{}
 	rows, _ := database.Db.Query(`
 	SELECT *
-	FROM wol3`)
+	FROM wolhosts`)
 	for rows.Next() {
 		var host models.Host
 		err := rows.Scan(&host.HostId, &host.Name, &host.MacAddress, &host.IpAddress, &host.AlternatePort, &host.OnlineStatus, &host.IsProxmox)
@@ -264,6 +270,11 @@ func createHost(c *gin.Context) models.Host {
 	onlineStatus := pingHost(ipAdd.String())
 	alternatePort := c.PostForm("alternatePort")
 	isProxmox := false
+	if c.PostForm("username") != "" {
+		isProxmox = true
+	}
+	fmt.Println("isProxmox: ", isProxmox)
+
 	newhost := models.Host{Name: c.PostForm("name"),
 		MacAddress:    newMac,
 		IpAddress:     ipAdd.String(),

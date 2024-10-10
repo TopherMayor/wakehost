@@ -15,6 +15,17 @@ import (
 	models "github.com/tophmayor/wakehost/models"
 )
 
+type PostgresTableSchema struct {
+	schemaname  string
+	tablename   string
+	tableowner  string
+	tablespace  any
+	hasindexes  bool
+	hasrules    bool
+	hastriggers bool
+	rowsecurity bool
+}
+
 type PostgresConfig struct {
 	Host     string
 	Port     string
@@ -41,6 +52,9 @@ var DbConfig PostgresConfigStore
 var SelectedConfigName string
 var DBConnected bool
 var ConfigNeeded bool
+var InitialSetup bool
+var WolhostCreated bool
+var PVEhostCreated bool
 
 func LoadDatabaseConfig() error {
 	content, configErr := os.ReadFile("config.json")
@@ -72,6 +86,7 @@ func ConnectDatabase() {
 	} else {
 		Db = db
 		DBConnected = true
+		checkIfTablesCreated()
 		fmt.Println("Successfully connected to database!")
 	}
 }
@@ -83,12 +98,10 @@ func ConnectProxmox(pveHost models.PVEHost) {
 			},
 		},
 	}
-	fmt.Println("pveHost: ", pveHost)
 	credentials := proxmox.Credentials{
 		Username: pveHost.Credentials.Username + "@pam",
 		Password: pveHost.Credentials.Password,
 	}
-	fmt.Println("credentials: ", credentials)
 	proxmoxClient := proxmox.NewClient(`http://`+pveHost.IpAddress+`:8006/api2/json`,
 		proxmox.WithCredentials(&credentials),
 		proxmox.WithHTTPClient(&insecureHTTPClient),
@@ -109,7 +122,6 @@ func PostSetupHandler(c *gin.Context) {
 		Name:     c.PostForm("dbname"),
 		SSLMode:  sslEnabled,
 	}
-	fmt.Println("newConfig:", newConfig)
 
 	DbConfig.Databases[newConfig.Name] = newConfig
 	content, _ := json.Marshal(DbConfig)
@@ -120,4 +132,71 @@ func PostSetupHandler(c *gin.Context) {
 	ConfigNeeded = false
 	SelectedConfigName = newConfig.Name
 	c.Redirect(302, "/home")
+}
+
+func checkIfTablesCreated() {
+	rows, tableErr := Db.Query(`SELECT *
+	FROM pg_catalog.pg_tables
+	WHERE schemaname != 'pg_catalog' AND 
+		schemaname != 'information_schema';`)
+	fmt.Println("tables: ", rows)
+	if tableErr != nil {
+		fmt.Println("err ", tableErr)
+	} else {
+		if rows != nil {
+			for rows.Next() {
+				var table PostgresTableSchema
+				err := rows.Scan(&table.schemaname, &table.tablename, &table.tableowner, &table.tablespace, &table.hasindexes, &table.hasrules, &table.hastriggers, &table.rowsecurity)
+				if err != nil {
+					panic(err)
+				}
+				fmt.Println("table:", table)
+				if table.tablename == "wolhosts" {
+					WolhostCreated = true
+				}
+				if table.tablename == "pvehosts" {
+					PVEhostCreated = true
+				}
+
+			}
+		}
+	}
+	if !WolhostCreated || !PVEhostCreated {
+		createDBTables()
+	} else {
+		fmt.Println("tables exist")
+
+	}
+}
+
+func createDBTables() {
+	if !WolhostCreated {
+		// create wolhost table
+		fmt.Println("creating wolhost table")
+
+		Db.Exec(`CREATE TABLE wolhosts (
+		hostid SERIAL PRIMARY KEY,
+		name TEXT UNIQUE NOT NULL,
+		macaddress MACADDR UNIQUE NOT NULL,
+		ipaddress INET UNIQUE NOT NULL,
+		alternateport TEXT,
+		onlinestatus BOOLEAN,
+		proxmox BOOLEAN
+	  );`)
+	}
+	if !PVEhostCreated {
+		fmt.Println("creating pvehost table")
+		Db.Exec(`CREATE TABLE pvehosts (
+		proxmoxid SERIAL PRIMARY KEY,
+		name TEXT UNIQUE NOT NULL,
+		username TEXT UNIQUE NOT NULL,
+		password TEXT UNIQUE NOT NULL,
+		macaddress MACADDR UNIQUE NOT NULL,
+		ipaddress INET UNIQUE NOT NULL,
+		alternateport TEXT,
+		onlinestatus BOOLEAN,
+		apiekey TEXT
+	  );`)
+	}
+
 }
