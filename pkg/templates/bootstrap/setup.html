@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Add Host</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+    <style>
+        .container {
+            max-width: 90vw;
+            width: 500px;
+        }
+    </style>
+</head>
+
+<body class="bg-dark text-light">
+    <div class="container b-4 my-5 bg-dark text-light shadow-lg">
+        <h2>Configure WakeHost Postgresql DB</h2>
+        <p>
+            The following is necessary to connect to a Postgresql Database
+        </p>
+        <form method="post">
+            <div class="form-group">
+                <label for="password">Database IP Address</label>
+                <input type="text" class="form-control" id="dbip" name="dbip" placeholder="(Required)" required />
+            </div>
+            <div class="form-group">
+                <label for="ipAddress">Port</label>
+                <input type="text" class="form-control" id="dbport" name="dbport" placeholder="(Required)" required />
+            </div>
+            <div class="form-group">
+                <label for="macAddress">User</label>
+                <input type="text" class="form-control" id="dbuser" name="dbuser" placeholder="(Required)" required />
+            </div>
+            <div class="form-group">
+                <label for="alternatePort">Password</label>
+                <input type="text" class="form-control" id="dbpassword" name="dbpassword" placeholder="(Required)"
+                    required />
+            </div>
+            <div class="form-group">
+                <label for="alternatePort">Database Name</label>
+                <input type="text" class="form-control" id="dbname" name="dbname" placeholder="(Required)" required />
+            </div>
+            <div class="form-check my-3" hidden>
+                <input type="checkbox" class="form-check-input" id="ssl" onClick="sslEnabled(this)" value="disable" />
+                <label class="form-check-label">SSLMode</label>
+            </div>
+            <button type="submit" class="btn btn-primary">Submit</button>
+        </form>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+        function showPass(checkbox) {
+            if (checkbox.checked == true) {
+                document.getElementById("password").type = "text";
+                document.getElementById("apikey").type = "text";
+            } else {
+                document.getElementById("password").type = "password";
+                document.getElementById("apikey").type = "text";
+            }
+        }
+        function sslEnabled(checkbox) {
+            if (checkbox.checked == true) {
+                document.getElementById("ssl").value = "enable";
+
+            } else {
+                document.getElementById("ssl").value = "disable";
+
+            }
+        }
+    </script>
+</body>
+
+</html>

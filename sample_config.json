@@ -1,0 +1,12 @@
+{
+  "Databases": {
+    "wakehost": {
+      "Host": "192.168.0.1",
+      "Port": "5432",
+      "User": "user",
+      "Password": "password",
+      "Name": "databasename",
+      "SSLMode": "disable"
+    }
+  }
+}
