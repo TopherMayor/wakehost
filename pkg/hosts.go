@@ -243,16 +243,21 @@ func addHost(newhost models.Host) {
 
 func getHosts() {
 	var currentHosts = map[string]models.Host{}
-	rows, _ := database.Db.Query(`
+	rows, rowErr := database.Db.Query(`
 	SELECT *
 	FROM wolhosts`)
-	for rows.Next() {
-		var host models.Host
-		err := rows.Scan(&host.HostId, &host.Name, &host.MacAddress, &host.IpAddress, &host.AlternatePort, &host.OnlineStatus, &host.IsProxmox)
-		if err != nil {
-			panic(err)
+	if rowErr != nil {
+		panic(rowErr)
+	}
+	if rows != nil {
+		for rows.Next() {
+			var host models.Host
+			err := rows.Scan(&host.HostId, &host.Name, &host.MacAddress, &host.IpAddress, &host.AlternatePort, &host.OnlineStatus, &host.IsProxmox)
+			if err != nil {
+				panic(err)
+			}
+			currentHosts[host.Name] = host
 		}
-		currentHosts[host.Name] = host
 	}
 	rows.Close()
 	hosts = currentHosts
@@ -317,9 +322,12 @@ func sendWol(key string) {
 	}
 }
 func sendUDPPacket(mp *wol.MagicPacket, addr string) (err error) {
+
 	udpAdd, _ := net.ResolveUDPAddr("udp", "255.255.255.255:9")
 	bs, err := mp.Marshal()
 	var localAddr *net.UDPAddr
+	fmt.Println("localAddr:", localAddr)
+	fmt.Println("addr:", addr)
 	conn, err := net.DialUDP("udp", localAddr, udpAdd)
 	if err != nil {
 		return err

@@ -4,7 +4,6 @@ import (
 	"embed"
 	"fmt"
 	"html/template"
-	io "io/fs"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -14,9 +13,6 @@ import (
 
 //go:embed templates/*
 var templateFS embed.FS
-
-//go:embed templates/static/*
-var staticFiles embed.FS
 
 var hosts = map[string]models.Host{}
 var pveHosts = map[string]models.PVEHost{}
@@ -46,11 +42,7 @@ func Router() *gin.Engine {
 
 	}
 	r.SetHTMLTemplate(tmpl)
-	static := r.Group("/")
-	{
-		fs, _ := io.Sub(staticFiles, "templates/static")
-		static.StaticFS("/static/", http.FS(fs))
-	}
+
 	r.GET("/", getBaseUrlHandler)
 	r.GET("/setup", getSetupHandler)
 	r.POST("/setup", database.PostSetupHandler)

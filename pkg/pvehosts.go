@@ -2,6 +2,7 @@ package router
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -67,29 +68,20 @@ func postPVEHostHandler(c *gin.Context) {
 	useVM(pve, c.PostForm("vm"), start)
 	c.Redirect(302, "/pvehosts/"+name)
 }
-func addPVEHostHandler(c *gin.Context) {
-	newPVEhost := models.PVEHost{Name: c.PostForm("name"),
-		MacAddress:    c.PostForm("macAddress"),
-		IpAddress:     c.PostForm("ipAddress"),
-		AlternatePort: c.PostForm("alternatePort"),
-		OnlineStatus:  pingHost((c.PostForm("ipAddress"))),
-		Credentials: proxmox.Credentials{
-			Username: c.PostForm("username"),
-			Password: c.PostForm("password"),
-		},
-	}
-	addPVEHost(newPVEhost)
-	c.Redirect(302, "/pvehosts")
-}
+
 func addPVEHost(newPVEhost models.PVEHost) {
+	fmt.Println("newPVEHost: ", newPVEhost)
+
 	rows, rowErr := database.Db.Query(`
 	SELECT *
-	FROM pve1
-	WHERE name=$1 OR  macAddress=$2 OR ipAddress=$3`, newPVEhost.Name, newPVEhost.MacAddress, newPVEhost.IpAddress)
+	FROM pvehosts
+	WHERE name=$1 OR  macaddress=$2 OR ipaddress=$3`, newPVEhost.Name, newPVEhost.MacAddress, newPVEhost.IpAddress)
 	if rowErr != nil {
 		panic(rowErr)
 	}
 	if rows != nil {
+		fmt.Println("scanning")
+
 		for rows.Next() {
 			var host models.PVEHost
 			err := rows.Scan(&newPVEhost.PVEId, &newPVEhost.Name, &newPVEhost.Credentials.Username, &newPVEhost.Credentials.Password, &newPVEhost.MacAddress, &newPVEhost.IpAddress, &newPVEhost.AlternatePort, &newPVEhost.OnlineStatus, &newPVEhost.ApiKey)
@@ -103,24 +95,31 @@ func addPVEHost(newPVEhost models.PVEHost) {
 		}
 	}
 	if !ContainsPVEHost(pveHosts, newPVEhost) {
+		fmt.Println("inserting")
+
 		database.Db.Exec(`
-		INSERT INTO pve1(name, macAddress, ipAddress, alternatePort, onlineStatus, username, password, apiKey) 
+		INSERT INTO pvehosts(name, macaddress, ipaddress, alternateport, onlinestatus, username, password, apikey) 
 		VALUES($1, $2, $3, $4, $5, $6, $7, $8);
-	`, newPVEhost.Name, newPVEhost.MacAddress, newPVEhost.IpAddress, newPVEhost.AlternatePort, newPVEhost.OnlineStatus, newPVEhost.Credentials.Username, newPVEhost.Credentials.Password, "")
+	`, newPVEhost.Name, newPVEhost.MacAddress, newPVEhost.IpAddress, newPVEhost.AlternatePort, newPVEhost.OnlineStatus, newPVEhost.Credentials.Username, newPVEhost.Credentials.Password, nil)
 	}
 }
 func getPVEHosts() {
 	var currentHosts = map[string]models.PVEHost{}
-	rows, _ := database.Db.Query(`
+	rows, rowErr := database.Db.Query(`
 	SELECT *
-	FROM pve1`)
-	for rows.Next() {
-		var host models.PVEHost
-		err := rows.Scan(&host.PVEId, &host.Name, &host.Credentials.Username, &host.Credentials.Password, &host.MacAddress, &host.IpAddress, &host.AlternatePort, &host.OnlineStatus, &host.ApiKey)
-		if err != nil {
-			panic(err)
+	FROM pvehosts`)
+	if rowErr != nil {
+		panic(rowErr)
+	}
+	if rows != nil {
+		for rows.Next() {
+			var host models.PVEHost
+			err := rows.Scan(&host.PVEId, &host.Name, &host.Credentials.Username, &host.Credentials.Password, &host.MacAddress, &host.IpAddress, &host.AlternatePort, &host.OnlineStatus, &host.ApiKey)
+			if err != nil {
+				panic(err)
+			}
+			currentHosts[host.Name] = host
 		}
-		currentHosts[host.Name] = host
 	}
 	rows.Close()
 	pveHosts = currentHosts

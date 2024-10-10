@@ -174,7 +174,7 @@ func createDBTables() {
 		// create wolhost table
 		fmt.Println("creating wolhost table")
 
-		Db.Exec(`CREATE TABLE wolhosts (
+		wolResult, wolError := Db.Exec(`CREATE TABLE wolhosts (
 		hostid SERIAL PRIMARY KEY,
 		name TEXT UNIQUE NOT NULL,
 		macaddress MACADDR UNIQUE NOT NULL,
@@ -183,10 +183,15 @@ func createDBTables() {
 		onlinestatus BOOLEAN,
 		proxmox BOOLEAN
 	  );`)
+		if wolError != nil {
+			fmt.Println("wolError: ", wolError)
+		}
+		fmt.Println("wolResult: ", wolResult)
+
 	}
 	if !PVEhostCreated {
 		fmt.Println("creating pvehost table")
-		Db.Exec(`CREATE TABLE pvehosts (
+		pveResult, pveError := Db.Exec(`CREATE TABLE pvehosts (
 		proxmoxid SERIAL PRIMARY KEY,
 		name TEXT UNIQUE NOT NULL,
 		username TEXT UNIQUE NOT NULL,
@@ -195,8 +200,12 @@ func createDBTables() {
 		ipaddress INET UNIQUE NOT NULL,
 		alternateport TEXT,
 		onlinestatus BOOLEAN,
-		apiekey TEXT
+		apikey TEXT
 	  );`)
+		if pveError != nil {
+			fmt.Println("wolError: ", pveError)
+		}
+		fmt.Println("wolResult: ", pveResult)
 	}
 
 }
