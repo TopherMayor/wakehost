@@ -100,7 +100,7 @@ func addPVEHost(newPVEhost models.PVEHost) {
 		database.Db.Exec(`
 		INSERT INTO pvehosts(name, macaddress, ipaddress, alternateport, onlinestatus, username, password, apikey) 
 		VALUES($1, $2, $3, $4, $5, $6, $7, $8);
-	`, newPVEhost.Name, newPVEhost.MacAddress, newPVEhost.IpAddress, newPVEhost.AlternatePort, newPVEhost.OnlineStatus, newPVEhost.Credentials.Username, newPVEhost.Credentials.Password, nil)
+	`, newPVEhost.Name, newPVEhost.MacAddress, newPVEhost.IpAddress, newPVEhost.AlternatePort, newPVEhost.OnlineStatus, newPVEhost.Credentials.Username, newPVEhost.Credentials.Password, newPVEhost.ApiKey)
 	}
 }
 func getPVEHosts() {

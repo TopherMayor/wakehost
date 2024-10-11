@@ -200,7 +200,7 @@ func createDBTables() {
 		ipaddress INET UNIQUE NOT NULL,
 		alternateport TEXT,
 		onlinestatus BOOLEAN,
-		apikey TEXT
+		apikey TEXT UNIQUE NOT NULL
 	  );`)
 		if pveError != nil {
 			fmt.Println("wolError: ", pveError)
