@@ -15,16 +15,7 @@ import (
 	models "github.com/tophmayor/wakehost/models"
 )
 
-func checkifHostsOnline() {
-	for _, v := range hosts {
-		onlineStatus := pingHost(v.IpAddress)
-		if onlineStatus != v.OnlineStatus {
-			v.OnlineStatus = onlineStatus
-		}
-		database.Db.Exec(`UPDATE wolhosts
-			SET onlineStatus=$1 WHERE name=$2;`, onlineStatus, v.Name)
-	}
-}
+// Handler Functions
 func getAddHostHandler(c *gin.Context) {
 	if database.ConfigNeeded {
 		c.Redirect(302, "/setup")
@@ -66,7 +57,7 @@ func postHostHandler(c *gin.Context) {
 
 	}
 	if wol != "" {
-		sendWol(c.PostForm("wol"))
+		go sendWol(c.PostForm("wol"))
 		c.Redirect(302, "/registeredhosts")
 
 	}
@@ -149,6 +140,8 @@ func postEditHostHandler(c *gin.Context) {
 	updateHost(updatedHost)
 	c.Redirect(302, "/registeredhosts")
 }
+
+// Handler Utils
 func deleteHost(hostName string) {
 	fmt.Println("deleting?", hostName)
 	_, errDel := database.Db.Exec(`DELETE FROM wolhosts
@@ -280,7 +273,7 @@ func getHosts() {
 	}
 	rows.Close()
 	hosts = currentHosts
-	checkifHostsOnline()
+	go checkifHostsOnline()
 
 }
 
@@ -382,4 +375,14 @@ func Compare(host1 models.Host, host models.Host) bool {
 		return true
 	}
 	return false
+}
+func checkifHostsOnline() {
+	for _, v := range hosts {
+		onlineStatus := pingHost(v.IpAddress)
+		if onlineStatus != v.OnlineStatus {
+			v.OnlineStatus = onlineStatus
+		}
+		database.Db.Exec(`UPDATE wolhosts
+			SET onlineStatus=$1 WHERE name=$2;`, onlineStatus, v.Name)
+	}
 }

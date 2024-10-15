@@ -12,28 +12,7 @@ import (
 	models "github.com/tophmayor/wakehost/models"
 )
 
-func ContainsPVEHost(hosts map[string]models.PVEHost, host models.PVEHost) bool {
-	for k, v := range hosts {
-		if k == host.Name && v == host {
-			return true
-		}
-	}
-	return false
-}
-func ComparePVEHosts(host1 models.PVEHost, host2 models.PVEHost) bool {
-
-	if host1.Name == host2.Name {
-		return true
-	}
-	if host1.MacAddress == host2.MacAddress {
-		return true
-	}
-	if host1.IpAddress == host2.IpAddress {
-		return true
-	}
-	return false
-}
-
+// Handler Functions
 func getPVEHostHandler(c *gin.Context) {
 	getPVEHosts()
 	if database.ConfigNeeded {
@@ -55,21 +34,37 @@ func getPVEHostHandler(c *gin.Context) {
 }
 
 func postPVEHostHandler(c *gin.Context) {
-	var start bool
+	// var start bool
 	name := c.Param("name")
 	proxClient := database.CurrentProxmoxClient
 	pve, _ := proxClient.Node(context.Background(), name)
 
-	strstart := c.PostForm("start")
-	if strstart == "start" {
-		start = true
-	} else {
-		start = false
+	start := c.PostForm("start")
+	stop := c.PostForm("stop")
+	restart := c.PostForm("restart")
+
+	fmt.Println("START: ", start)
+	fmt.Println("START: ", stop)
+	fmt.Println("START: ", restart)
+	fmt.Println("START: ", name)
+
+	if start != "" {
+		fmt.Println("START")
+		go startVM(pve, start)
 	}
-	useVM(pve, c.PostForm("vm"), start)
+	if stop != "" {
+		fmt.Println("STOP")
+		go stopVM(pve, stop)
+	}
+	if restart != "" {
+		fmt.Println("RESTART")
+		go restartVM(pve, restart)
+	}
+	// useVM(pve, c.PostForm("vm"), start)
 	c.Redirect(302, "/pvehosts/"+name)
 }
 
+// Handler Utils
 func addPVEHost(newPVEhost models.PVEHost) {
 	fmt.Println("newPVEHost: ", newPVEhost)
 
@@ -146,15 +141,6 @@ func findPVEColumnDiffs(oldData models.PVEHost, newData models.PVEHost) ([]strin
 		token := newData.ApiCredentials.TokenId
 		values = append(values, token)
 	}
-	// if oldData. != newData.IsProxmox {
-	// 	columns = append(columns, "proxmox")
-	// 	isProxmox := newData.IsProxmox
-	// 	if isProxmox {
-	// 		values = append(values, `true`)
-	// 	} else {
-	// 		values = append(values, `false`)
-	// 	}
-	// }
 	return columns, values
 }
 func updatePVEHost(host models.PVEHost) {
@@ -206,7 +192,29 @@ func getPVEHosts() {
 	rows.Close()
 	pveHosts = currentHosts
 }
+func ContainsPVEHost(hosts map[string]models.PVEHost, host models.PVEHost) bool {
+	for k, v := range hosts {
+		if k == host.Name && v == host {
+			return true
+		}
+	}
+	return false
+}
+func ComparePVEHosts(host1 models.PVEHost, host2 models.PVEHost) bool {
 
+	if host1.Name == host2.Name {
+		return true
+	}
+	if host1.MacAddress == host2.MacAddress {
+		return true
+	}
+	if host1.IpAddress == host2.IpAddress {
+		return true
+	}
+	return false
+}
+
+// Proxmox Functions
 func startVM(node *proxmox.Node, key string) {
 	vmid, _ := strconv.Atoi(key)
 	vm, _ := node.VirtualMachine(context.Background(), vmid)
@@ -217,10 +225,16 @@ func stopVM(node *proxmox.Node, key string) {
 	vm, _ := node.VirtualMachine(context.Background(), vmid)
 	vm.Stop(context.Background())
 }
-func useVM(node *proxmox.Node, key string, start bool) {
-	if start {
-		startVM(node, key)
-	} else {
-		stopVM(node, key)
-	}
+func restartVM(node *proxmox.Node, key string) {
+	vmid, _ := strconv.Atoi(key)
+	vm, _ := node.VirtualMachine(context.Background(), vmid)
+	vm.Reboot(context.Background())
 }
+
+// func useVM(node *proxmox.Node, key string, start bool) {
+// 	if start {
+// 		startVM(node, key)
+// 	} else {
+// 		stopVM(node, key)
+// 	}
+// }

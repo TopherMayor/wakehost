@@ -103,6 +103,7 @@ func Router() *gin.Engine {
 	return r
 }
 
+// Handler Functions
 func getHomeHandler(c *gin.Context) {
 	if database.ConfigNeeded {
 		c.Redirect(302, "/setup")

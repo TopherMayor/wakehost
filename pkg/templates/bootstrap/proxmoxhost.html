@@ -59,19 +59,20 @@
                         <ul class="dropdown-menu">
                             <li>
                                 <form method="post" class="dropdown-item">
-                                    <button type="submit" class="form-control" id="vm" name="vm"
-                                        value="{{$element.VMID}}">
-                                        <input type="hidden" class="form-control" id="start" name="start" value="start">
-                                        Start
-                                    </button>
+                                    <button type="submit" class="form-control" id="start" name="start"
+                                        value="{{$element.VMID}}">Start</button>
                                 </form>
                             </li>
                             <li>
                                 <form method="post" class="dropdown-item">
-                                    <button type="submit" class="form-control" id="vm" name="vm"
-                                        value="{{$element.VMID}}">
-                                        <input type="hidden" class="form-control" id="start" name="start" value="stop">
-                                        Stop</button>
+                                    <button type="submit" class="form-control" id="stop" name="stop"
+                                        value="{{$element.VMID}}">Stop</button>
+                                </form>
+                            </li>
+                            <li>
+                                <form method="post" class="dropdown-item">
+                                    <button type="submit" class="form-control" id="restart" name="restart"
+                                        value="{{$element.VMID}}">Reboot</button>
                                 </form>
                             </li>
                         </ul>
