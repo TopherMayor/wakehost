@@ -35,6 +35,7 @@ func ComparePVEHosts(host1 models.PVEHost, host2 models.PVEHost) bool {
 }
 
 func getPVEHostHandler(c *gin.Context) {
+	getPVEHosts()
 	if database.ConfigNeeded {
 		c.Redirect(302, "/setup")
 	} else {
@@ -84,7 +85,7 @@ func addPVEHost(newPVEhost models.PVEHost) {
 
 		for rows.Next() {
 			var host models.PVEHost
-			err := rows.Scan(&newPVEhost.PVEId, &newPVEhost.Name, &newPVEhost.Credentials.Username, &newPVEhost.Credentials.Password, &newPVEhost.MacAddress, &newPVEhost.IpAddress, &newPVEhost.AlternatePort, &newPVEhost.OnlineStatus, &newPVEhost.ApiKey)
+			err := rows.Scan(&newPVEhost.PVEId, &newPVEhost.Name, &newPVEhost.Credentials.Username, &newPVEhost.Credentials.Password, &newPVEhost.MacAddress, &newPVEhost.IpAddress, &newPVEhost.AlternatePort, &newPVEhost.OnlineStatus, &newPVEhost.ApiCredentials.Secret, &newPVEhost.ApiCredentials.TokenId)
 			if err != nil {
 				panic(err)
 			}
@@ -97,10 +98,91 @@ func addPVEHost(newPVEhost models.PVEHost) {
 	if !ContainsPVEHost(pveHosts, newPVEhost) {
 		fmt.Println("inserting")
 
-		database.Db.Exec(`
-		INSERT INTO pvehosts(name, macaddress, ipaddress, alternateport, onlinestatus, username, password, apikey) 
-		VALUES($1, $2, $3, $4, $5, $6, $7, $8);
-	`, newPVEhost.Name, newPVEhost.MacAddress, newPVEhost.IpAddress, newPVEhost.AlternatePort, newPVEhost.OnlineStatus, newPVEhost.Credentials.Username, newPVEhost.Credentials.Password, newPVEhost.ApiKey)
+		_, pveErr := database.Db.Exec(`
+		INSERT INTO pvehosts(name, macaddress, ipaddress, alternateport, onlinestatus, username, password, apikey, apitoken) 
+		VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9);
+	`, newPVEhost.Name, newPVEhost.MacAddress, newPVEhost.IpAddress, newPVEhost.AlternatePort, newPVEhost.OnlineStatus, newPVEhost.Credentials.Username, newPVEhost.Credentials.Password, newPVEhost.ApiCredentials.Secret, newPVEhost.ApiCredentials.TokenId)
+		if pveErr != nil {
+			fmt.Println("pveErrInsert: ", pveErr)
+		}
+		pveHosts[newPVEhost.Name] = newPVEhost
+	}
+}
+func findPVEColumnDiffs(oldData models.PVEHost, newData models.PVEHost) ([]string, []string) {
+	var columns []string
+	var values []string
+
+	if oldData.Name != newData.Name {
+		columns = append(columns, "name")
+		values = append(values, newData.Name)
+	}
+	if oldData.IpAddress != newData.IpAddress {
+		columns = append(columns, "ipAddress")
+		values = append(values, newData.IpAddress)
+	}
+	if oldData.MacAddress != newData.MacAddress {
+		columns = append(columns, "macAddress")
+		values = append(values, newData.MacAddress)
+	}
+	if oldData.AlternatePort != newData.AlternatePort {
+		columns = append(columns, "alternatePort")
+		alternatePort := newData.AlternatePort
+		values = append(values, alternatePort)
+	}
+	if oldData.Credentials != newData.Credentials && newData.Credentials.Password != "" {
+		columns = append(columns, "username")
+		username := newData.Credentials.Username
+		values = append(values, username)
+		columns = append(columns, "password")
+		password := newData.Credentials.Password
+		values = append(values, password)
+
+	}
+	if oldData.ApiCredentials != newData.ApiCredentials && newData.ApiCredentials.Secret != "" {
+		columns = append(columns, "apikey")
+		secret := newData.ApiCredentials.Secret
+		values = append(values, secret)
+		columns = append(columns, "apitoken")
+		token := newData.ApiCredentials.TokenId
+		values = append(values, token)
+	}
+	// if oldData. != newData.IsProxmox {
+	// 	columns = append(columns, "proxmox")
+	// 	isProxmox := newData.IsProxmox
+	// 	if isProxmox {
+	// 		values = append(values, `true`)
+	// 	} else {
+	// 		values = append(values, `false`)
+	// 	}
+	// }
+	return columns, values
+}
+func updatePVEHost(host models.PVEHost) {
+	columns, values := findPVEColumnDiffs(currentPVEHost, host)
+
+	cmd := ""
+	for i, v := range columns {
+		if v == "macAddress" || v == "ipAddress" {
+			if v == "macAddress" {
+				cmd += v + "=" + `CAST('` + values[i] + `' AS macaddr)`
+
+			} else {
+				cmd += v + "=" + `CAST('` + values[i] + `' AS inet)`
+			}
+		} else {
+			cmd += v + `='` + values[i] + `'`
+		}
+		if i < len(columns)-1 {
+			cmd += ", "
+		}
+	}
+	var final = `UPDATE pvehosts
+	SET ` + cmd + ` WHERE name='` + currentHost.Name + `';`
+	_, err := database.Db.Exec(final)
+	if err != nil {
+		fmt.Println("panic")
+
+		panic(err)
 	}
 }
 func getPVEHosts() {
@@ -114,7 +196,7 @@ func getPVEHosts() {
 	if rows != nil {
 		for rows.Next() {
 			var host models.PVEHost
-			err := rows.Scan(&host.PVEId, &host.Name, &host.Credentials.Username, &host.Credentials.Password, &host.MacAddress, &host.IpAddress, &host.AlternatePort, &host.OnlineStatus, &host.ApiKey)
+			err := rows.Scan(&host.PVEId, &host.Name, &host.Credentials.Username, &host.Credentials.Password, &host.MacAddress, &host.IpAddress, &host.AlternatePort, &host.OnlineStatus, &host.ApiCredentials.Secret, &host.ApiCredentials.TokenId)
 			if err != nil {
 				panic(err)
 			}
@@ -124,6 +206,7 @@ func getPVEHosts() {
 	rows.Close()
 	pveHosts = currentHosts
 }
+
 func startVM(node *proxmox.Node, key string) {
 	vmid, _ := strconv.Atoi(key)
 	vm, _ := node.VirtualMachine(context.Background(), vmid)

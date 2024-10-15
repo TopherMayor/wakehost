@@ -37,7 +37,7 @@ func getEditHostHandler(c *gin.Context) {
 	if database.ConfigNeeded {
 		c.Redirect(302, "/setup")
 	} else {
-		c.HTML(http.StatusOK, "edithosts.html", gin.H{"Host": currentHost})
+		c.HTML(http.StatusOK, "edithosts.html", gin.H{"Host": currentHost, "PVEHost": currentPVEHost})
 	}
 }
 
@@ -111,7 +111,7 @@ func postEditHostHandler(c *gin.Context) {
 	ipAdd := net.ParseIP(c.PostForm("ipAddress"))
 	onlineStatus := pingHost(ipAdd.String())
 	alternatePort := c.PostForm("alternatePort")
-	isProxmox := false
+	isProxmox := currentHost.IsProxmox
 	fmt.Println("username: ", c.PostForm("username"))
 
 	if c.PostForm("username") != "" {
@@ -126,8 +126,17 @@ func postEditHostHandler(c *gin.Context) {
 				Username: c.PostForm("username"),
 				Password: c.PostForm("password"),
 			},
+			ApiCredentials: models.PVEAPICredentials{
+				Secret:  c.PostForm("secret"),
+				TokenId: c.PostForm("token"),
+			},
 		}
-		addPVEHost(newPVEhost)
+		if currentHost.IsProxmox {
+			updatePVEHost(newPVEhost)
+		} else {
+			addPVEHost(newPVEhost)
+
+		}
 
 	}
 	updatedHost := models.Host{Name: c.PostForm("name"),
@@ -145,8 +154,16 @@ func deleteHost(hostName string) {
 	_, errDel := database.Db.Exec(`DELETE FROM wolhosts
 	 WHERE name=$1;`, hostName)
 	if errDel != nil {
-		fmt.Println("panic")
-		panic(errDel)
+		fmt.Println("panic wol del")
+		// panic(errDel)
+	}
+	if currentHost.IsProxmox {
+		_, errDel := database.Db.Exec(`DELETE FROM pvehosts
+	 WHERE name=$1;`, hostName)
+		if errDel != nil {
+			fmt.Println("panic pve del")
+			// panic(errDel)
+		}
 	}
 }
 
@@ -238,11 +255,13 @@ func addHost(newhost models.Host) {
 		INSERT INTO wolhosts(name, macaddress, ipaddress, alternateport, onlinestatus, proxmox) 
 		VALUES($1, $2, $3, $4, $5, $6);`, newhost.Name, newhost.MacAddress, newhost.IpAddress, newhost.AlternatePort, newhost.OnlineStatus, newhost.IsProxmox)
 	}
+	hosts[newhost.Name] = newhost
 
 }
 
 func getHosts() {
 	var currentHosts = map[string]models.Host{}
+
 	rows, rowErr := database.Db.Query(`
 	SELECT *
 	FROM wolhosts`)

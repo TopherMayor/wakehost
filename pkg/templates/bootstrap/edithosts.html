@@ -40,9 +40,34 @@
           placeholder="{{.Host.AlternatePort}}" value="{{.Host.AlternatePort}}" />
       </div>
       <div class="form-check my-3">
-        <input type="checkbox" class="form-check-input" id="proxmox" onClick="showProx(this)" value="" />
+        <input type="checkbox" class="form-check-input" id="proxmox" onClick="showProx(this)" value=""
+          checked="{{.Host.IsProxmox}}" />
         <label class="form-check-label">Proxmox</label>
       </div>
+      {{if .Host.IsProxmox}}
+      <div class="form-group proxmox">
+        <label for="alternatePort">Proxmox Username</label>
+        <input type="text" class="form-control" id="username" name="username" value="{{.PVEHost.Credentials.Username}}"
+          placeholder="(Required)" />
+      </div>
+      <div class="form-group proxmox">
+        <label for="alternatePort">Proxmox Password</label>
+        <input type="password" class="form-control" id="password" name="password" value="" placeholder="(Required)" />
+      </div>
+      <div class="form-group proxmox">
+        <label for="alternatePort">Proxmox API TokenId</label>
+        <input type="text" class="form-control" id="token" name="token" value="{{.PVEHost.ApiCredentials.TokenId}}"
+          placeholder="(Optional)" />
+      </div>
+      <div class="form-group proxmox">
+        <label for="alternatePort">Proxmox API Key</label>
+        <input type="password" class="form-control" id="secret" name="secret" value="" placeholder="(Optional)" />
+      </div>
+      <div class="form-check my-3 proxmox">
+        <input type="checkbox" class="form-check-input" id="credentials" onClick="showPass(this)" />
+        <label class="form-check-label">Show Credentials</label>
+      </div>
+      {{else}}
       <div class="form-group proxmox" hidden="true">
         <label for="alternatePort">Proxmox Username</label>
         <input type="text" class="form-control" id="username" name="username" placeholder="(Required)" />
@@ -52,13 +77,18 @@
         <input type="password" class="form-control" id="password" name="password" placeholder="(Required)" />
       </div>
       <div class="form-group proxmox" hidden="true">
+        <label for="alternatePort">Proxmox API TokenId</label>
+        <input type="text" class="form-control" id="token" name="token" placeholder="(Optional)" />
+      </div>
+      <div class="form-group proxmox" hidden="true">
         <label for="alternatePort">Proxmox API Key</label>
-        <input type="password" class="form-control" id="apikey" name="apikey" placeholder="(Optional)" />
+        <input type="password" class="form-control" id="secret" name="secret" placeholder="(Optional)" />
       </div>
       <div class="form-check my-3 proxmox" hidden="true">
         <input type="checkbox" class="form-check-input" id="credentials" onClick="showPass(this)" />
         <label class="form-check-label">Show Credentials</label>
       </div>
+      {{end}}
       <button type="submit" class="btn btn-primary">Submit</button>
     </form>
   </div>
@@ -68,10 +98,10 @@
     function showPass(checkbox) {
       if (checkbox.checked == true) {
         document.getElementById("password").type = "text";
-        document.getElementById("apikey").type = "text";
+        document.getElementById("secret").type = "text";
       } else {
         document.getElementById("password").type = "password";
-        document.getElementById("apikey").type = "text";
+        document.getElementById("secret").type = "text";
       }
     }
     function showProx(checkbox) {
@@ -91,6 +121,7 @@
         }
       }
     }
+
   </script>
 </body>
 

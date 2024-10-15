@@ -86,11 +86,15 @@ func ConnectDatabase() {
 	} else {
 		Db = db
 		DBConnected = true
-		checkIfTablesCreated()
+
 		fmt.Println("Successfully connected to database!")
+		checkIfTablesCreated()
+
 	}
 }
 func ConnectProxmox(pveHost models.PVEHost) {
+	fmt.Println("proxmoxHost: ", pveHost)
+
 	insecureHTTPClient := http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
@@ -102,12 +106,32 @@ func ConnectProxmox(pveHost models.PVEHost) {
 		Username: pveHost.Credentials.Username + "@pam",
 		Password: pveHost.Credentials.Password,
 	}
-	proxmoxClient := proxmox.NewClient(`http://`+pveHost.IpAddress+`:8006/api2/json`,
-		proxmox.WithCredentials(&credentials),
-		proxmox.WithHTTPClient(&insecureHTTPClient),
-	)
-	fmt.Println("proxmoxClient: ", proxmoxClient)
-	CurrentProxmoxClient = proxmoxClient
+	tokenId := credentials.Username + "!" + pveHost.ApiCredentials.TokenId
+	secret := pveHost.ApiCredentials.Secret
+
+	if tokenId != "" && secret != "" {
+		CurrentProxmoxClient = proxmox.NewClient(`http://`+pveHost.IpAddress+`:8006/api2/json`,
+			proxmox.WithAPIToken(tokenId, secret),
+			proxmox.WithHTTPClient(&insecureHTTPClient),
+		)
+		fmt.Println("proxmoxClient: ", CurrentProxmoxClient)
+
+	} else {
+		if pveHost.Credentials.Username != "" && pveHost.Credentials.Password != "" {
+
+			CurrentProxmoxClient = proxmox.NewClient(`http://`+pveHost.IpAddress+`:8006/api2/json`,
+				proxmox.WithCredentials(&credentials),
+				proxmox.WithHTTPClient(&insecureHTTPClient),
+			)
+			fmt.Println("proxmoxClient: ", CurrentProxmoxClient)
+
+		} else {
+			fmt.Println("Credential Error. Failed Client Initialization")
+
+		}
+	}
+
+	// CurrentProxmoxClient = proxmoxClient
 }
 
 func PostSetupHandler(c *gin.Context) {
@@ -165,12 +189,71 @@ func checkIfTablesCreated() {
 		createDBTables()
 	} else {
 		fmt.Println("tables exist")
+		testDBTables()
+	}
+}
+
+func testDBTables() {
+	fmt.Println("TESTING")
+
+	//test via insert
+	//1) wolhosts
+
+	wolRes, wolErr := Db.Exec(`
+	INSERT INTO wolhosts(name, macaddress, ipaddress, alternateport, onlinestatus, proxmox) 
+	VALUES('test', 'aa:aa:aa:aa:aa:aa', '1.1.1.1', '', false, false);`)
+	if wolErr != nil {
+		WolhostCreated = false
+		fmt.Println("WOLE: ", wolErr)
+
+	} else {
+		fmt.Println("WOL Result: ", wolRes)
+		// 	_, delErr := Db.Exec(`DELETE FROM wolhosts
+		//  WHERE name=test1;`)
+		// 	if delErr != nil {
+		// 		fmt.Println("panic")
+		// 		// panic(errDel)
+		// 	}
+	}
+	_, delErr := Db.Exec(`DELETE FROM wolhosts
+	WHERE name='test';`)
+	if delErr != nil {
+		fmt.Println("panic: ", delErr)
+		// panic(errDel)
+	}
+	//2) pvehosts
+	pveRes, pveErr := Db.Exec(`
+	INSERT INTO pvehosts(name, macaddress, ipaddress, alternateport, onlinestatus, username, password, apikey, apitoken) 
+	VALUES('test1', 'aa:aa:aa:aa:aa:aa', '1.1.1.1', '', false, 'test', 'password', '', '');
+`)
+	if pveErr != nil {
+		PVEhostCreated = false
+		fmt.Println("pveE: ", pveErr)
+
+	} else {
+		fmt.Println("PVE Result: ", pveRes)
+
+	}
+	_, delPVEErr := Db.Exec(`DELETE FROM pvehosts
+	WHERE name='test1';`)
+	if delPVEErr != nil {
+		fmt.Println("panic: ", delPVEErr)
+		// panic(errDel)
+	}
+	if !WolhostCreated || !PVEhostCreated {
+		createDBTables()
+	} else {
+		fmt.Println("Test Complete")
 
 	}
 }
 
 func createDBTables() {
 	if !WolhostCreated {
+		//Try to Drop Tables to prevent creation errors
+
+		Db.Exec(`DROP TABLE IF EXISTS wolhosts;`)
+
 		// create wolhost table
 		fmt.Println("creating wolhost table")
 
@@ -179,9 +262,9 @@ func createDBTables() {
 		name TEXT UNIQUE NOT NULL,
 		macaddress MACADDR UNIQUE NOT NULL,
 		ipaddress INET UNIQUE NOT NULL,
-		alternateport TEXT,
-		onlinestatus BOOLEAN,
-		proxmox BOOLEAN
+		alternateport TEXT NOT NULL,
+		onlinestatus BOOLEAN NOT NULL,
+		proxmox BOOLEAN NOT NULL
 	  );`)
 		if wolError != nil {
 			fmt.Println("wolError: ", wolError)
@@ -190,6 +273,10 @@ func createDBTables() {
 
 	}
 	if !PVEhostCreated {
+		//Try to Drop Tables to prevent creation errors
+
+		Db.Exec(`DROP TABLE IF EXISTS pvehosts;`)
+
 		fmt.Println("creating pvehost table")
 		pveResult, pveError := Db.Exec(`CREATE TABLE pvehosts (
 		proxmoxid SERIAL PRIMARY KEY,
@@ -198,9 +285,10 @@ func createDBTables() {
 		password TEXT UNIQUE NOT NULL,
 		macaddress MACADDR UNIQUE NOT NULL,
 		ipaddress INET UNIQUE NOT NULL,
-		alternateport TEXT,
-		onlinestatus BOOLEAN,
-		apikey TEXT UNIQUE NOT NULL
+		alternateport TEXT NOT NULL,
+		onlinestatus BOOLEAN NOT NULL,
+		apikey TEXT UNIQUE NOT NULL,
+		apitoken TEXT UNIQUE NOT NULL          
 	  );`)
 		if pveError != nil {
 			fmt.Println("wolError: ", pveError)

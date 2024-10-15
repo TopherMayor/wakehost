@@ -31,12 +31,17 @@ func (a *Host) Scan(value interface{}) error {
 }
 
 type PVEHost struct {
-	PVEId         int    `json:"id"`
-	Name          string `json:"name"`
-	MacAddress    string `json:"macAddress"`
-	IpAddress     string `json:"ipAddress"`
-	AlternatePort string `json:"alternatePort"`
-	OnlineStatus  bool   `json:"onlineStatus"`
-	Credentials   proxmox.Credentials
-	ApiKey        string
+	PVEId          int    `json:"id"`
+	Name           string `json:"name"`
+	MacAddress     string `json:"macAddress"`
+	IpAddress      string `json:"ipAddress"`
+	AlternatePort  string `json:"alternatePort"`
+	OnlineStatus   bool   `json:"onlineStatus"`
+	Credentials    proxmox.Credentials
+	ApiCredentials PVEAPICredentials
+}
+
+type PVEAPICredentials struct {
+	Secret  string
+	TokenId string
 }
