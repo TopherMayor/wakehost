@@ -4,75 +4,76 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/luthermonson/go-proxmox"
-	"github.com/sabhiram/go-wol/wol"
 	"github.com/tatsushid/go-fastping"
 	database "github.com/tophmayor/wakehost/db"
 	models "github.com/tophmayor/wakehost/models"
 )
 
 // Handler Functions
-func getAddHostHandler(c *gin.Context) {
-	if database.ConfigNeeded {
-		c.Redirect(302, "/setup")
-	} else {
-		c.HTML(http.StatusOK, "addhosts.html", gin.H{"Hosts": hosts})
-	}
-}
+// func getAddHostHandler(c *gin.Context) {
+// 	if database.ConfigNeeded {
+// 		c.Redirect(302, "/setup")
+// 	} else {
+// 		c.HTML(http.StatusOK, "addhosts.html", gin.H{"Hosts": hosts})
+// 	}
+// }
 
-func getEditHostHandler(c *gin.Context) {
-	if database.ConfigNeeded {
-		c.Redirect(302, "/setup")
-	} else {
-		c.HTML(http.StatusOK, "edithosts.html", gin.H{"Host": currentHost, "PVEHost": currentPVEHost})
-	}
-}
+// func getEditHostHandler(c *gin.Context) {
+// 	if database.ConfigNeeded {
+// 		c.Redirect(302, "/setup")
+// 	} else {
+// 		c.HTML(http.StatusOK, "edithosts.html", gin.H{"Host": currentHost, "PVEHost": currentPVEHost})
+// 	}
+// }
 
 func getHostsHandler(c *gin.Context) {
 	if database.ConfigNeeded {
-		c.Redirect(302, "/setup")
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "data": "", "message": "Failed"})
+
 	} else {
 		getHosts()
-		currentTime := time.Now().Format(time.RFC850)
-		c.HTML(http.StatusOK, "hosts.html", gin.H{"Hosts": hosts, "CurrentTime": currentTime})
+		// currentTime := time.Now().Format(time.RFC850)
+		c.JSON(http.StatusOK, gin.H{"success": true, "data": hosts, "message": "Success"})
 		fmt.Println("hosts:", hosts)
 	}
 }
 
-func postHostHandler(c *gin.Context) {
-	wol := c.PostForm("wol")
-	del := c.PostForm("delete")
-	update := c.PostForm("update")
-	addhost := c.PostForm("addhost")
+// func postHostHandler(c *gin.Context) {
+// 	wol := c.PostForm("wol")
+// 	del := c.PostForm("delete")
+// 	update := c.PostForm("update")
+// 	addhost := c.PostForm("addhost")
 
-	if del != "" {
-		fmt.Println("del:", del)
+// 	if del != "" {
+// 		fmt.Println("del:", del)
 
-		deleteHost(c.PostForm("delete"))
-		c.Redirect(302, "/registeredhosts")
+// 		deleteHost(c.PostForm("delete"))
+// 		c.Redirect(302, "/registeredhosts")
 
-	}
-	if wol != "" {
-		go sendWol(c.PostForm("wol"))
-		c.Redirect(302, "/registeredhosts")
+// 	}
+// 	if wol != "" {
+// 		go sendWol(c.PostForm("wol"))
+// 		c.Redirect(302, "/registeredhosts")
 
-	}
-	if update != "" {
-		currentHost = hosts[update]
-		if currentHost.IsProxmox {
-			currentPVEHost = pveHosts[update]
-		}
-		fmt.Println("CURRENT:", currentHost.Name)
-		c.Redirect(302, "/registeredhosts/edit/"+currentHost.Name)
-	}
-	if addhost != "" {
-		c.Redirect(302, "/addhost")
-	}
-}
+//		}
+//		if update != "" {
+//			currentHost = hosts[update]
+//			if currentHost.IsProxmox {
+//				currentPVEHost = pveHosts[update]
+//			}
+//			fmt.Println("CURRENT:", currentHost.Name)
+//			c.Redirect(302, "/registeredhosts/edit/"+currentHost.Name)
+//		}
+//		if addhost != "" {
+//			c.Redirect(302, "/addhost")
+//		}
+//	}
 func addHostHandler(c *gin.Context) {
 	fmt.Println("adding")
 	newhost := createHost(c)
@@ -94,133 +95,176 @@ func addHostHandler(c *gin.Context) {
 		addPVEHost(newPVEhost)
 	}
 	addHost(newhost)
-	c.Redirect(302, "/registeredhosts")
-}
-func postEditHostHandler(c *gin.Context) {
-	mac := strings.ToUpper(c.PostForm("macAddress"))
-	newMac := strings.ReplaceAll(mac, "-", ":")
-	ipAdd := net.ParseIP(c.PostForm("ipAddress"))
-	onlineStatus := pingHost(ipAdd.String())
-	alternatePort := c.PostForm("alternatePort")
-	isProxmox := currentHost.IsProxmox
-	fmt.Println("username: ", c.PostForm("username"))
-
-	if c.PostForm("username") != "" {
-		isProxmox = true
-
-		newPVEhost := models.PVEHost{Name: c.PostForm("name"),
-			MacAddress:    c.PostForm("macAddress"),
-			IpAddress:     c.PostForm("ipAddress"),
-			AlternatePort: c.PostForm("alternatePort"),
-			OnlineStatus:  pingHost((c.PostForm("ipAddress"))),
-			Credentials: proxmox.Credentials{
-				Username: c.PostForm("username"),
-				Password: c.PostForm("password"),
-			},
-			ApiCredentials: models.PVEAPICredentials{
-				Secret:  c.PostForm("secret"),
-				TokenId: c.PostForm("token"),
-			},
-		}
-		if currentHost.IsProxmox {
-			updatePVEHost(newPVEhost)
-		} else {
-			addPVEHost(newPVEhost)
-
-		}
-
-	}
-	updatedHost := models.Host{Name: c.PostForm("name"),
-		MacAddress:    newMac,
-		IpAddress:     ipAdd.String(),
-		AlternatePort: alternatePort,
-		OnlineStatus:  onlineStatus,
-		IsProxmox:     isProxmox,
-	}
-	updateHost(updatedHost)
-	c.Redirect(302, "/registeredhosts")
+	c.JSON(http.StatusCreated, newhost)
 }
 
-// Handler Utils
-func deleteHost(hostName string) {
-	fmt.Println("deleting?", hostName)
-	_, errDel := database.Db.Exec(`DELETE FROM wolhosts
-	 WHERE name=$1;`, hostName)
-	if errDel != nil {
-		fmt.Println("panic wol del")
-		// panic(errDel)
+// GetHostByID retrieves a host by its ID from the database
+func getHostByIDHandler(c *gin.Context) {
+	idParam := c.Param("id")
+	id, err := strconv.Atoi(idParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid host ID"})
+		return
+	}
+
+	var host models.Host
+	err = database.Db.QueryRow("SELECT id, name, macaddress, ipaddress, alternateport, onlinestatus, proxmox FROM wolhosts WHERE id=$1", id).
+		Scan(&host.HostId, &host.Name, &host.MacAddress, &host.IpAddress, &host.AlternatePort, &host.OnlineStatus, &host.IsProxmox)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Host not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": host})
+}
+
+// func postEditHostHandler(c *gin.Context) {
+// 	mac := strings.ToUpper(c.PostForm("macAddress"))
+// 	newMac := strings.ReplaceAll(mac, "-", ":")
+// 	ipAdd := net.ParseIP(c.PostForm("ipAddress"))
+// 	onlineStatus := pingHost(ipAdd.String())
+// 	alternatePort := c.PostForm("alternatePort")
+// 	isProxmox := currentHost.IsProxmox
+// 	fmt.Println("username: ", c.PostForm("username"))
+
+// 	if c.PostForm("username") != "" {
+// 		isProxmox = true
+
+// 		newPVEhost := models.PVEHost{Name: c.PostForm("name"),
+// 			MacAddress:    c.PostForm("macAddress"),
+// 			IpAddress:     c.PostForm("ipAddress"),
+// 			AlternatePort: c.PostForm("alternatePort"),
+// 			OnlineStatus:  pingHost((c.PostForm("ipAddress"))),
+// 			Credentials: proxmox.Credentials{
+// 				Username: c.PostForm("username"),
+// 				Password: c.PostForm("password"),
+// 			},
+// 			ApiCredentials: models.PVEAPICredentials{
+// 				Secret:  c.PostForm("secret"),
+// 				TokenId: c.PostForm("token"),
+// 			},
+// 		}
+// 		if currentHost.IsProxmox {
+// 			updatePVEHost(newPVEhost)
+// 		} else {
+// 			addPVEHost(newPVEhost)
+
+// 		}
+
+// 	}
+// 	updatedHost := models.Host{Name: c.PostForm("name"),
+// 		MacAddress:    newMac,
+// 		IpAddress:     ipAdd.String(),
+// 		AlternatePort: alternatePort,
+// 		OnlineStatus:  onlineStatus,
+// 		IsProxmox:     isProxmox,
+// 	}
+// 	updateHost(updatedHost)
+// 	c.Redirect(302, "/registeredhosts")
+// }
+
+// UpdateHost updates an existing host in the database
+func updateHost(c *gin.Context) {
+	idParam := c.Param("id")
+	id, err := strconv.Atoi(idParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid host ID"})
+		return
+	}
+
+	var updatedHost models.Host
+	if err := c.ShouldBindJSON(&updatedHost); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	result, err := database.Db.Exec(
+		"UPDATE wolhosts SET name=$1, macaddress=$2, ipaddress=$3, alternateport=$4, onlinestatus=$5, isproxmox=$6 WHERE id=$7",
+		updatedHost.Name, updatedHost.MacAddress, updatedHost.IpAddress, updatedHost.AlternatePort, updatedHost.OnlineStatus, updatedHost.IsProxmox, id,
+	)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Host not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Host updated successfully"})
+}
+
+// DeleteHost removes a host from the database by its ID
+func DeleteHost(c *gin.Context) {
+	idParam := c.Param("id")
+	id, err := strconv.Atoi(idParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid host ID"})
+		return
+	}
+
+	wolResult, wolErr := database.Db.Exec("DELETE FROM wolhosts WHERE id=$1", id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": wolErr.Error()})
+		return
+	}
+	wolRowsAffected, _ := wolResult.RowsAffected()
+	if wolRowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "WOL Host not found"})
+
+		return
 	}
 	if currentHost.IsProxmox {
-		_, errDel := database.Db.Exec(`DELETE FROM pvehosts
-	 WHERE name=$1;`, hostName)
-		if errDel != nil {
-			fmt.Println("panic pve del")
-			// panic(errDel)
+		pveResult, pveErr := database.Db.Exec("DELETE FROM pvehosts WHERE id=$1", id)
+		if pveErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": pveErr.Error()})
+			return
+		}
+		pveRowsAffected, _ := pveResult.RowsAffected()
+		if pveRowsAffected == 0 {
+			c.JSON(http.StatusNotFound, gin.H{"error": "PVE Host not found"})
+			return
 		}
 	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Host deleted successfully"})
 }
 
-func updateHost(host models.Host) {
-	columns, values := findColumnDiffs(currentHost, host)
+// func findColumnDiffs(oldData models.Host, newData models.Host) ([]string, []string) {
+// 	var columns []string
+// 	var values []string
 
-	cmd := ""
-	for i, v := range columns {
-		if v == "macAddress" || v == "ipAddress" {
-			if v == "macAddress" {
-				cmd += v + "=" + `CAST('` + values[i] + `' AS macaddr)`
-
-			} else {
-				cmd += v + "=" + `CAST('` + values[i] + `' AS inet)`
-			}
-		} else {
-			cmd += v + `='` + values[i] + `'`
-		}
-		if i < len(columns)-1 {
-			cmd += ", "
-		}
-	}
-	var final = `UPDATE wolhosts
-	SET ` + cmd + ` WHERE name='` + currentHost.Name + `';`
-	_, err := database.Db.Exec(final)
-	if err != nil {
-		fmt.Println("panic")
-
-		panic(err)
-	}
-}
-
-func findColumnDiffs(oldData models.Host, newData models.Host) ([]string, []string) {
-	var columns []string
-	var values []string
-
-	if oldData.Name != newData.Name {
-		columns = append(columns, "name")
-		values = append(values, newData.Name)
-	}
-	if oldData.IpAddress != newData.IpAddress {
-		columns = append(columns, "ipAddress")
-		values = append(values, newData.IpAddress)
-	}
-	if oldData.MacAddress != newData.MacAddress {
-		columns = append(columns, "macAddress")
-		values = append(values, newData.MacAddress)
-	}
-	if oldData.AlternatePort != newData.AlternatePort {
-		columns = append(columns, "alternatePort")
-		alternatePort := newData.AlternatePort
-		values = append(values, alternatePort)
-	}
-	if oldData.IsProxmox != newData.IsProxmox {
-		columns = append(columns, "proxmox")
-		isProxmox := newData.IsProxmox
-		if isProxmox {
-			values = append(values, `true`)
-		} else {
-			values = append(values, `false`)
-		}
-	}
-	return columns, values
-}
+// 	if oldData.Name != newData.Name {
+// 		columns = append(columns, "name")
+// 		values = append(values, newData.Name)
+// 	}
+// 	if oldData.IpAddress != newData.IpAddress {
+// 		columns = append(columns, "ipAddress")
+// 		values = append(values, newData.IpAddress)
+// 	}
+// 	if oldData.MacAddress != newData.MacAddress {
+// 		columns = append(columns, "macAddress")
+// 		values = append(values, newData.MacAddress)
+// 	}
+// 	if oldData.AlternatePort != newData.AlternatePort {
+// 		columns = append(columns, "alternatePort")
+// 		alternatePort := newData.AlternatePort
+// 		values = append(values, alternatePort)
+// 	}
+// 	if oldData.IsProxmox != newData.IsProxmox {
+// 		columns = append(columns, "proxmox")
+// 		isProxmox := newData.IsProxmox
+// 		if isProxmox {
+// 			values = append(values, `true`)
+// 		} else {
+// 			values = append(values, `false`)
+// 		}
+// 	}
+// 	return columns, values
+// }
 
 func addHost(newhost models.Host) {
 	rows, rowErr := database.Db.Query(`
@@ -248,12 +292,12 @@ func addHost(newhost models.Host) {
 		INSERT INTO wolhosts(name, macaddress, ipaddress, alternateport, onlinestatus, proxmox) 
 		VALUES($1, $2, $3, $4, $5, $6);`, newhost.Name, newhost.MacAddress, newhost.IpAddress, newhost.AlternatePort, newhost.OnlineStatus, newhost.IsProxmox)
 	}
-	hosts[newhost.Name] = newhost
+	hosts = append(hosts, newhost)
 
 }
 
 func getHosts() {
-	var currentHosts = map[string]models.Host{}
+	var currentHosts = []models.Host{}
 
 	rows, rowErr := database.Db.Query(`
 	SELECT *
@@ -268,7 +312,7 @@ func getHosts() {
 			if err != nil {
 				panic(err)
 			}
-			currentHosts[host.Name] = host
+			currentHosts = append(currentHosts, host)
 		}
 	}
 	rows.Close()
@@ -320,44 +364,46 @@ func pingHost(ipAddress string) bool {
 	}
 	return onlineStatus
 }
-func sendWol(key string) {
-	host := hosts[key]
-	if packet, err := wol.New(host.MacAddress); err == nil {
-		alternatePort := host.AlternatePort
-		if alternatePort != "" {
-			sendUDPPacket(packet, host.IpAddress+":"+host.AlternatePort) // specify receiving port
-		} else {
-			sendUDPPacket(packet, host.IpAddress+":9")
 
-		}
+// func sendWol(key string) {
+// 	host := hosts[key]
+// 	if packet, err := wol.New(host.MacAddress); err == nil {
+// 		alternatePort := host.AlternatePort
+// 		if alternatePort != "" {
+// 			sendUDPPacket(packet, host.IpAddress+":"+host.AlternatePort) // specify receiving port
+// 		} else {
+// 			sendUDPPacket(packet, host.IpAddress+":9")
 
-	}
-}
-func sendUDPPacket(mp *wol.MagicPacket, addr string) (err error) {
+// 		}
 
-	udpAdd, _ := net.ResolveUDPAddr("udp", "255.255.255.255:9")
-	bs, err := mp.Marshal()
-	var localAddr *net.UDPAddr
-	fmt.Println("localAddr:", localAddr)
-	fmt.Println("addr:", addr)
-	conn, err := net.DialUDP("udp", localAddr, udpAdd)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
+// 	}
+// }
 
-	n, err := conn.Write(bs)
-	if err == nil && n != 102 {
-		err = fmt.Errorf("magic packet sent was %d bytes (expected 102 bytes sent)", n)
-	}
-	if err != nil {
-		return err
-	}
-	return err
-}
-func Contains(hosts map[string]models.Host, host models.Host) bool {
-	for k, v := range hosts {
-		if k == host.Name && v == host {
+// func sendUDPPacket(mp *wol.MagicPacket, addr string) (err error) {
+
+// 	udpAdd, _ := net.ResolveUDPAddr("udp", "255.255.255.255:9")
+// 	bs, err := mp.Marshal()
+// 	var localAddr *net.UDPAddr
+// 	fmt.Println("localAddr:", localAddr)
+// 	fmt.Println("addr:", addr)
+// 	conn, err := net.DialUDP("udp", localAddr, udpAdd)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	defer conn.Close()
+
+//		n, err := conn.Write(bs)
+//		if err == nil && n != 102 {
+//			err = fmt.Errorf("magic packet sent was %d bytes (expected 102 bytes sent)", n)
+//		}
+//		if err != nil {
+//			return err
+//		}
+//		return err
+//	}
+func Contains(hosts []models.Host, host models.Host) bool {
+	for v := range hosts {
+		if hosts[v].Name == host.Name {
 			return true
 		}
 	}
