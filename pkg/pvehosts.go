@@ -1,11 +1,13 @@
 package router
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/luthermonson/go-proxmox"
 	database "github.com/tophmayor/wakehost/db"
 	models "github.com/tophmayor/wakehost/models"
 )
@@ -24,21 +26,63 @@ func getPVEHostHandler(c *gin.Context) {
 		}
 		var host models.PVEHost
 		err = database.Db.QueryRow("SELECT id, name, macaddress, ipaddress, alternateport, onlinestatus, username, password, apikey, apitoken  FROM pvehosts WHERE id=$1", id).
-			Scan(&host.PVEId, &host.Name, &host.MacAddress, &host.IpAddress, &host.AlternatePort, &host.OnlineStatus, &host.Credentials.Username, &host.Credentials.Password, &host.ApiCredentials.Secret, &host.ApiCredentials.TokenId)
+			Scan(&host.Id, &host.Name, &host.MacAddress, &host.IpAddress, &host.AlternatePort, &host.OnlineStatus, &host.Credentials.Username, &host.Credentials.Password, &host.ApiCredentials.Secret, &host.ApiCredentials.TokenId)
 		if err != nil {
 			fmt.Println("err:", err)
 			c.JSON(http.StatusNotFound, gin.H{"error": "Host not found"})
 			return
 		}
 		currentPVEHost = host
-		c.JSON(http.StatusOK, host)
+
 		database.ConnectProxmox(currentPVEHost)
+		proxClient := database.CurrentProxmoxClient
+
+		node, nodeErr := proxClient.Node(context.Background(), currentPVEHost.Name)
+		if nodeErr != nil {
+			panic(nodeErr)
+		}
+		nodeVms, _ := node.VirtualMachines(context.Background())
+		data := models.PVEHostDataResponse{host, nodeVms}
+		c.JSON(http.StatusOK, gin.H{"success": true, "data": data, "message": "Success"})
 	}
 }
 
 func getAllPVEHosts(c *gin.Context) {
 	getPVEHosts()
-	c.JSON(http.StatusOK, pveHosts)
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": pveHosts, "message": "Success"})
+	fmt.Println("hosts:", pveHosts)
+
+}
+
+func pveHostActionHandler(c *gin.Context) {
+	fmt.Println("pveHost")
+
+	//get Host and params.
+	var pveHostActionParams models.PVEHostActionParams
+	if err := c.ShouldBindJSON(&pveHostActionParams); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	host := pveHostActionParams.Host
+	fmt.Println("updatedHost: ", pveHostActionParams.Host)
+	proxClient := database.CurrentProxmoxClient
+	pve, _ := proxClient.Node(context.Background(), host.Name)
+	switch pveHostActionParams.Action {
+	// start host
+	case models.StartVM:
+		startVM(pve, pveHostActionParams.Vmid)
+	case models.StopVM:
+		stopVM(pve, pveHostActionParams.Vmid)
+	case models.RestartVM:
+		restartVM(pve, pveHostActionParams.Vmid)
+
+		// if !host.OnlineStatus {
+		// 	sendWol(strconv.Itoa(host.Id))
+		// 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Wol Packet Sent"})
+		// 	return
+		// }
+	}
+
 }
 
 // func postPVEHostHandler(c *gin.Context) {
@@ -88,7 +132,7 @@ func addPVEHost(newPVEhost models.PVEHost) {
 
 		for rows.Next() {
 			var host models.PVEHost
-			err := rows.Scan(&newPVEhost.PVEId, &newPVEhost.Name, &newPVEhost.Credentials.Username, &newPVEhost.Credentials.Password, &newPVEhost.MacAddress, &newPVEhost.IpAddress, &newPVEhost.AlternatePort, &newPVEhost.OnlineStatus, &newPVEhost.ApiCredentials.Secret, &newPVEhost.ApiCredentials.TokenId)
+			err := rows.Scan(&newPVEhost.Id, &newPVEhost.Name, &newPVEhost.Credentials.Username, &newPVEhost.Credentials.Password, &newPVEhost.MacAddress, &newPVEhost.IpAddress, &newPVEhost.AlternatePort, &newPVEhost.OnlineStatus, &newPVEhost.ApiCredentials.Secret, &newPVEhost.ApiCredentials.TokenId)
 			if err != nil {
 				panic(err)
 			}
@@ -112,46 +156,6 @@ func addPVEHost(newPVEhost models.PVEHost) {
 	}
 }
 
-// func findPVEColumnDiffs(oldData models.PVEHost, newData models.PVEHost) ([]string, []string) {
-// 	var columns []string
-// 	var values []string
-
-// 	if oldData.Name != newData.Name {
-// 		columns = append(columns, "name")
-// 		values = append(values, newData.Name)
-// 	}
-// 	if oldData.IpAddress != newData.IpAddress {
-// 		columns = append(columns, "ipAddress")
-// 		values = append(values, newData.IpAddress)
-// 	}
-// 	if oldData.MacAddress != newData.MacAddress {
-// 		columns = append(columns, "macAddress")
-// 		values = append(values, newData.MacAddress)
-// 	}
-// 	if oldData.AlternatePort != newData.AlternatePort {
-// 		columns = append(columns, "alternatePort")
-// 		alternatePort := newData.AlternatePort
-// 		values = append(values, alternatePort)
-// 	}
-// 	if oldData.Credentials != newData.Credentials && newData.Credentials.Password != "" {
-// 		columns = append(columns, "username")
-// 		username := newData.Credentials.Username
-// 		values = append(values, username)
-// 		columns = append(columns, "password")
-// 		password := newData.Credentials.Password
-// 		values = append(values, password)
-
-// 	}
-// 	if oldData.ApiCredentials != newData.ApiCredentials && newData.ApiCredentials.Secret != "" {
-// 		columns = append(columns, "apikey")
-// 		secret := newData.ApiCredentials.Secret
-// 		values = append(values, secret)
-// 		columns = append(columns, "apitoken")
-// 		token := newData.ApiCredentials.TokenId
-// 		values = append(values, token)
-// 	}
-// 	return columns, values
-// }
 // func updatePVEHost(host models.PVEHost) {
 // 	columns, values := findPVEColumnDiffs(currentPVEHost, host)
 
@@ -191,7 +195,7 @@ func getPVEHosts() {
 	if rows != nil {
 		for rows.Next() {
 			var host models.PVEHost
-			err := rows.Scan(&host.PVEId, &host.Name, &host.Credentials.Username, &host.Credentials.Password, &host.MacAddress, &host.IpAddress, &host.AlternatePort, &host.OnlineStatus, &host.ApiCredentials.Secret, &host.ApiCredentials.TokenId)
+			err := rows.Scan(&host.Id, &host.Name, &host.Credentials.Username, &host.Credentials.Password, &host.MacAddress, &host.IpAddress, &host.AlternatePort, &host.OnlineStatus, &host.ApiCredentials.Secret, &host.ApiCredentials.TokenId)
 			if err != nil {
 				panic(err)
 			}
@@ -200,10 +204,13 @@ func getPVEHosts() {
 	}
 	rows.Close()
 	pveHosts = currentHosts
+	go checkifHostsOnline()
+
 }
+
 func ContainsPVEHost(hosts []models.PVEHost, host models.PVEHost) bool {
-	for v := range hosts {
-		if hosts[v].Name == host.Name {
+	for _, v := range hosts {
+		if v.Name == host.Name {
 			return true
 		}
 	}
@@ -224,21 +231,21 @@ func ComparePVEHosts(host1 models.PVEHost, host2 models.PVEHost) bool {
 }
 
 // Proxmox Functions
-// func startVM(node *proxmox.Node, key string) {
-// 	vmid, _ := strconv.Atoi(key)
-// 	vm, _ := node.VirtualMachine(context.Background(), vmid)
-// 	vm.Start(context.Background())
-// }
-// func stopVM(node *proxmox.Node, key string) {
-// 	vmid, _ := strconv.Atoi(key)
-// 	vm, _ := node.VirtualMachine(context.Background(), vmid)
-// 	vm.Stop(context.Background())
-// }
-// func restartVM(node *proxmox.Node, key string) {
-// 	vmid, _ := strconv.Atoi(key)
-// 	vm, _ := node.VirtualMachine(context.Background(), vmid)
-// 	vm.Reboot(context.Background())
-// }
+func startVM(node *proxmox.Node, key string) {
+	vmid, _ := strconv.Atoi(key)
+	vm, _ := node.VirtualMachine(context.Background(), vmid)
+	vm.Start(context.Background())
+}
+func stopVM(node *proxmox.Node, key string) {
+	vmid, _ := strconv.Atoi(key)
+	vm, _ := node.VirtualMachine(context.Background(), vmid)
+	vm.Stop(context.Background())
+}
+func restartVM(node *proxmox.Node, key string) {
+	vmid, _ := strconv.Atoi(key)
+	vm, _ := node.VirtualMachine(context.Background(), vmid)
+	vm.Reboot(context.Background())
+}
 
 // func useVM(node *proxmox.Node, key string, start bool) {
 // 	if start {

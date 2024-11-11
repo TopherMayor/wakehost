@@ -1,15 +1,13 @@
 package router
 
 import (
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	database "github.com/tophmayor/wakehost/db"
 	models "github.com/tophmayor/wakehost/models"
 )
 
-//go:embed templates/*
-// var templateFS embed.FS
-
-var hosts = []models.Host{}
+var wolHosts = []models.Host{}
 var pveHosts = []models.PVEHost{}
 var currentHost models.Host
 var currentPVEHost models.PVEHost
@@ -23,8 +21,14 @@ func loadInitialHosts() {
 func Router() *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
-
-	// tmpl := template.Must(template.ParseFS(templateFS, "templates/bootstrap/*"))
+	config := cors.Config{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+	}
+	r.Use(cors.New(config))
 	loadErr := database.LoadDatabaseConfig()
 	if loadErr != nil {
 		database.ConfigNeeded = true
@@ -43,7 +47,7 @@ func Router() *gin.Engine {
 			hosts.GET("", getHostsHandler)
 			hosts.GET("/:id", getHostByIDHandler)
 			hosts.POST("", addHostHandler)
-			hosts.PUT("/:id", updateHost)
+			hosts.PUT("/:id", updateHostHandler)
 			hosts.DELETE("/:id", DeleteHost)
 		}
 
@@ -52,14 +56,10 @@ func Router() *gin.Engine {
 			pvehosts.GET("", getAllPVEHosts)
 			pvehosts.GET("/:id", getPVEHostHandler)
 			// pvehosts.POST("", addPVEHost)
-			// pvehosts.PUT("/:id", handlers.UpdatePVEHost)
+			pvehosts.PUT("/:id", pveHostActionHandler)
 			// pvehosts.DELETE("/:id", handlers.DeletePVEHost)
 		}
 	}
-
-	// r.SetHTMLTemplate(tmpl)
-
-	// r.GET("/", getBaseUrlHandler)
 	// r.GET("/setup", getSetupHandler)
 	// r.POST("/setup", database.PostSetupHandler)
 	// r.GET("/home", getHomeHandler)
@@ -119,26 +119,3 @@ func Router() *gin.Engine {
 
 	return r
 }
-
-// Handler Functions
-// func getHomeHandler(c *gin.Context) {
-// 	if database.ConfigNeeded {
-// 		c.Redirect(302, "/setup")
-// 	} else {
-// 		if !database.DBConnected {
-// 			database.ConnectDatabase()
-// 			loadInitialHosts()
-// 		}
-// 		c.HTML(http.StatusOK, "index.html", gin.H{"Databases": database.DbConfig.Databases})
-// 	}
-// }
-// func getSetupHandler(c *gin.Context) {
-// 	c.HTML(http.StatusOK, "setup.html", gin.H{})
-// }
-// func getBaseUrlHandler(c *gin.Context) {
-// 	if database.ConfigNeeded {
-// 		c.Redirect(302, "/setup")
-// 	} else {
-// 		c.Redirect(302, "/home")
-// 	}
-// }

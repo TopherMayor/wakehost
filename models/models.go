@@ -9,7 +9,7 @@ import (
 )
 
 type Host struct {
-	HostId        int    `json:"id"`
+	Id            int    `json:"id"`
 	Name          string `json:"name"`
 	MacAddress    string `json:"macaddress"`
 	IpAddress     string `json:"ipaddress"`
@@ -31,7 +31,7 @@ func (a *Host) Scan(value interface{}) error {
 }
 
 type PVEHost struct {
-	PVEId          int    `json:"id"`
+	Id             int    `json:"id"`
 	Name           string `json:"name"`
 	MacAddress     string `json:"macAddress"`
 	IpAddress      string `json:"ipAddress"`
@@ -44,4 +44,36 @@ type PVEHost struct {
 type PVEAPICredentials struct {
 	Secret  string
 	TokenId string
+}
+
+type UpdateHostParams struct {
+	IsActionUpdate bool
+	Action         WOLHostAction
+	Host           Host
+}
+
+type PVEHostAction string
+
+const (
+	StartVM    PVEHostAction = "start-vm"
+	ShutdownVM PVEHostAction = "shutdown-vm"
+	StopVM     PVEHostAction = "stop-vm"
+	RestartVM  PVEHostAction = "restart-vm"
+)
+
+type WOLHostAction string
+
+const (
+	StartHost WOLHostAction = "start-host"
+)
+
+type PVEHostActionParams struct {
+	Action PVEHostAction
+	Host   PVEHost
+	Vmid   string
+}
+
+type PVEHostDataResponse struct {
+	Host    PVEHost
+	NodeVms proxmox.VirtualMachines
 }

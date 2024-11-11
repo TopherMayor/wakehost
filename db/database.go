@@ -258,7 +258,7 @@ func createDBTables() {
 		fmt.Println("creating wolhost table")
 
 		wolResult, wolError := Db.Exec(`CREATE TABLE wolhosts (
-		hostid SERIAL PRIMARY KEY,
+		id SERIAL PRIMARY KEY,
 		name TEXT UNIQUE NOT NULL,
 		macaddress MACADDR UNIQUE NOT NULL,
 		ipaddress INET UNIQUE NOT NULL,
@@ -279,7 +279,7 @@ func createDBTables() {
 
 		fmt.Println("creating pvehost table")
 		pveResult, pveError := Db.Exec(`CREATE TABLE pvehosts (
-		proxmoxid SERIAL PRIMARY KEY,
+		id SERIAL PRIMARY KEY,
 		name TEXT UNIQUE NOT NULL,
 		username TEXT UNIQUE NOT NULL,
 		password TEXT UNIQUE NOT NULL,
